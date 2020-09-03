@@ -1,0 +1,20 @@
+plugins {
+    id 'java'
+}
+
+group 'org.example'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile group: 'com.github.openstack4j.core', name: 'openstack4j-core', version: '3.3'
+    compile group: 'com.github.openstack4j.core.connectors', name: 'openstack4j-resteasy', version: '3.3'
+    implementation 'org.pacesys:openstack4j:3.2.0'
+}
+
+/* dependencies {
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+}*/
