@@ -10,12 +10,12 @@ import org.openstack4j.model.image.v2.ContainerFormat;
 import org.openstack4j.model.image.v2.DiskFormat;
 import org.openstack4j.model.image.v2.Image;
 import org.openstack4j.model.network.*;
+import org.openstack4j.model.network.options.PortListOptions;
 import org.openstack4j.model.storage.block.Volume;
 import org.openstack4j.openstack.OSFactory;
 
 import java.net.MalformedURLException;
 import java.net.URL;
-
 
 public class Main {
     public static void main(String[] args) throws MalformedURLException {
@@ -53,8 +53,8 @@ public class Main {
                         .containerFormat(ContainerFormat.BARE)
                         .visibility(Image.ImageVisibility.PUBLIC)
                         .diskFormat(DiskFormat.QCOW2)
-                        .minDisk(0l)
-                        .minRam(0l)
+                        .minDisk(0L)
+                        .minRam(0L)
                         .build()
         );
 
@@ -68,7 +68,7 @@ public class Main {
                 payload,
                 image1);
 
-        Network network1 = osClientV3.networking().network()
+        Network exnetwork = osClientV3.networking().network()
                 .create(Builders.network()
                         .adminStateUp(true)
                         .physicalNetwork("providerPhysicalNetwork")
@@ -77,18 +77,43 @@ public class Main {
                         .name("ext_net")
                         .build());
 
-        Subnet subnet1 = osClientV3.networking().subnet().create(Builders.subnet()
-                .name("ext_subnet")
-                .networkId(network1.getId())
+        Subnet ext_sub = osClientV3.networking().subnet().create(Builders.subnet()
+                .name("ext_sub")
+                .networkId(exnetwork.getId())
                 .addPool("211.183.3.100", "211.183.3.200")
                 .ipVersion(IPVersionType.V4)
+                .gateway("211.183.3.2")
+                .addDNSNameServer("8.8.8.8")
                 .cidr("211.183.3.0/24")
                 .build());
 
-        Port port1 = osClientV3.networking().port().create(Builders.port()
-                .name("ext-port1")
-                .networkId(network1.getId())
-                .fixedIp("211.183.3.101", subnet1.getId())
+        Network innetwork = osClientV3.networking().network()
+                .create(Builders.network()
+                        .adminStateUp(true)
+                        .networkType(NetworkType.VXLAN)
+                        .name("int_net")
+                        .build());
+
+        Subnet int_sub = osClientV3.networking().subnet().create(Builders.subnet()
+                .name("int_sub")
+                .networkId(innetwork.getId())
+                .addPool("192.168.100.101", "192.168.100.200")
+                .ipVersion(IPVersionType.V4)
+                .gateway("192.168.100.1")
+                .cidr("192.168.100.0/24")
+                .build());
+
+        Router router = osClientV3.networking().router().create(Builders.router()
+                .name("router1")
+                .adminStateUp(true)
+                .externalGateway(exnetwork.getId(),true)
+                .build());
+
+        //Remove to Check if it is possible to create servers without specified port for internal network.
+        Port int_port1 = osClientV3.networking().port().create(Builders.port()
+                .name("int_port1")
+                .networkId(innetwork.getId())
+                .fixedIp("192.168.100.150", int_sub.getId())
                 .build());
 
         Keypair kp = osClientV3.compute().keypairs().create("First-keypair", null);
@@ -108,14 +133,22 @@ public class Main {
                 .bootIndex(0);
 
         ServerCreate sc = Builders.server()
-                        .name("ubuntu-inst1")
-                        .flavor("1")
+                        .name("instance1")
+                        .flavor("2")
                         .image(image1.getId())
+                        .addNetworkPort(int_port1.getId())
                         .blockDevice(blockDeviceMappingBuilder.build())
-                        .addNetworkPort(port1.getId())
                         .addSecurityGroup("First Group").keypairName("First-keypair").build();
 
         Server server = osClientV3.compute().servers().boot(sc);
+
+        // Identify server port based on the server ID and the private network
+        Port port = osClientV3.networking().port().list(
+                PortListOptions.create().deviceId(server.getId()).networkId(innetwork.getId())).get(1);
+
+        // Create floating IP in the public network
+        NetFloatingIP fip = Builders.netFloatingIP().portId(port.getId()).floatingNetworkId(exnetwork.getId()).build();
+        fip = osClientV3.networking().floatingip().create(fip);
     }
 }
 
