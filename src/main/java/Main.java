@@ -10,7 +10,6 @@ import org.openstack4j.model.image.v2.ContainerFormat;
 import org.openstack4j.model.image.v2.DiskFormat;
 import org.openstack4j.model.image.v2.Image;
 import org.openstack4j.model.network.*;
-import org.openstack4j.model.network.options.PortListOptions;
 import org.openstack4j.model.storage.block.Volume;
 import org.openstack4j.openstack.OSFactory;
 
@@ -42,7 +41,6 @@ public class Main {
                         .name("First Volume")
                         .description("Simple volume to store backups on")
                         .size(20)
-                        .bootable(true)
                         .build()
                 );
 
@@ -74,6 +72,7 @@ public class Main {
                         .physicalNetwork("providerPhysicalNetwork")
                         .networkType(NetworkType.FLAT)
                         .isRouterExternal(true)
+                        .addAvailabilityZoneHints("nova")
                         .name("ext_net")
                         .build());
 
@@ -109,6 +108,9 @@ public class Main {
                 .externalGateway(exnetwork.getId(),true)
                 .build());
 
+        RouterInterface iface = osClientV3.networking().router()
+                .attachInterface(router.getId(), AttachInterfaceType.SUBNET, int_sub.getId());
+
         //Remove to Check if it is possible to create servers without specified port for internal network.
         Port int_port1 = osClientV3.networking().port().create(Builders.port()
                 .name("int_port1")
@@ -129,8 +131,7 @@ public class Main {
 
         BlockDeviceMappingBuilder blockDeviceMappingBuilder = Builders.blockDeviceMapping()
                 .uuid(volume1.getId())
-                .deviceName("/dev/vdb")
-                .bootIndex(0);
+                .deviceName("/dev/vdb");
 
         ServerCreate sc = Builders.server()
                         .name("instance1")
@@ -142,14 +143,9 @@ public class Main {
 
         Server server = osClientV3.compute().servers().boot(sc);
 
-        // Identify server port based on the server ID and the private network
-        Port port = osClientV3.networking().port().list(
-                PortListOptions.create().deviceId(server.getId()).networkId(innetwork.getId())).get(1);
-
-        // Create floating IP in the public network
+        /* Create floating IP in the public network
         NetFloatingIP fip = Builders.netFloatingIP().portId(port.getId()).floatingNetworkId(exnetwork.getId()).build();
         fip = osClientV3.networking().floatingip().create(fip);
+        */
     }
 }
-
-
