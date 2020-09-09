@@ -21,13 +21,6 @@ public class Main {
         // use Identifier.byId("domainId") or Identifier.byName("example-domain")
         Identifier domainIdentifier = Identifier.byName("Default");
 
-        // unscoped authentication
-        // as the username is not unique across domains you need to provide the domainIdentifier
-        /*OSClient.OSClientV3 osClientV3 = OSFactory.builderV3()
-                .endpoint("http://192.168.1.200:35357/v3")
-                .credentials("admin","test123", domainIdentifier)
-                .authenticate();
-        */
         // project scoped authentication
 
         OSClient.OSClientV3 osClientV3 = OSFactory.builderV3()
